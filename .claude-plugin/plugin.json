@@ -1,0 +1,21 @@
+{
+  "name": "claude-tmux-notifier",
+  "version": "0.1.0",
+  "description": "Desktop notifications for Claude Code that include the current tmux window name and your last prompt, so you can tell which session needs you at a glance.",
+  "author": {
+    "name": "yeodonghyeon1",
+    "url": "https://github.com/yeodonghyeon1"
+  },
+  "homepage": "https://github.com/yeodonghyeon1/claude-tmux-notifier",
+  "repository": "https://github.com/yeodonghyeon1/claude-tmux-notifier",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "tmux",
+    "notifications",
+    "notify-send",
+    "hooks",
+    "linux"
+  ]
+}
