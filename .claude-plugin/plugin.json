@@ -1,6 +1,6 @@
 {
   "name": "claude-tmux-notifier",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Desktop notifications for Claude Code that include the current tmux window name and your last prompt, so you can tell which session needs you at a glance.",
   "author": {
     "name": "yeodonghyeon1",

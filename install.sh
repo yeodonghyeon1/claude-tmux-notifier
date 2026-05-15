@@ -10,7 +10,9 @@ DEST=${CLAUDE_HOOKS_DIR:-$HOME/.claude/hooks}
 mkdir -p "$DEST"
 install -m 0755 "$REPO_DIR/hooks/tmux-notify-stop.sh"  "$DEST/"
 install -m 0755 "$REPO_DIR/hooks/tmux-notify-input.sh" "$DEST/"
-install -m 0755 "$REPO_DIR/hooks/tmux-notify-bg.sh"    "$DEST/"
+# Clean up any leftover bg.sh from older versions (≤ v0.2.x) that had
+# the click-to-jump action button. Safe to remove unconditionally.
+rm -f "$DEST/tmux-notify-bg.sh"
 
 echo
 echo "Hook scripts installed to: $DEST"

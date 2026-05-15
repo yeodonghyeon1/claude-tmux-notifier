@@ -25,13 +25,11 @@ You can finally tell **which** of your six Claude tabs is asking for permission,
 
 - **tmux window name in every notification** — taken from the pane Claude is actually running in (`tmux display-message`)
 - **Last user prompt embedded in the completion toast** — extracted from the session transcript, truncated to 30 characters
-- **Click-to-jump**: every notification ships an **`[Open session]` action button**. Click it and the script does `tmux select-window` on the originating window *and* raises the terminal emulator via `xdotool` (X11) so the right window comes forward — no more hunting through 12 tabs
 - **Two distinct severities**:
   - `Stop` hook → `normal` urgency, auto-dismisses after 8 seconds
   - `Notification` hook (permission / input prompts) → `critical` urgency, stays until you click it
 - **Tool result and system-reminder messages are filtered out** when picking the "last user prompt" — you only see what you actually typed
-- **Non-blocking hooks** — the actual notify-send call (which blocks until the user clicks or it expires) runs in a backgrounded helper, so the hook itself returns in <50ms and never holds up Claude
-- **Graceful fallback** when run outside tmux: notification title degrades to plain `Claude` instead of breaking; click-to-jump silently no-ops on Wayland or without xdotool
+- **Graceful fallback** when run outside tmux: notification title degrades to plain `Claude` instead of breaking
 
 ## Requirements
 
@@ -43,10 +41,8 @@ You can finally tell **which** of your six Claude tabs is asking for permission,
 Install the prerequisites on Ubuntu/Debian:
 
 ```bash
-sudo apt install libnotify-bin tmux jq xdotool
+sudo apt install libnotify-bin tmux jq
 ```
-
-> `xdotool` is optional — it powers the X11 window-raise on click. Without it, click-to-jump still switches the tmux window correctly, you just have to alt-tab to the terminal yourself.
 
 ## Install
 
@@ -107,20 +103,10 @@ Claude Code fires lifecycle hooks for every session. This plugin registers two o
 
 | Event | When it fires | What this plugin does |
 |------:|:--------------|:----------------------|
-| `Stop` | Claude finishes responding | Reads `transcript_path` from the hook input, scans the JSONL backwards for the most recent `type=="user"` message whose `content` is a string and doesn't start with `<` (filters out tool results and system reminders), takes its first line, truncates to 30 characters, and spawns the background notifier with `normal` urgency |
-| `Notification` | A permission prompt or input request is waiting | Pulls the `message` field from stdin (e.g. `"Permission needed for Bash(rm …)"`) and spawns the background notifier with `critical` urgency (sticky until clicked) |
+| `Stop` | Claude finishes responding | Reads `transcript_path` from the hook input, scans the JSONL backwards for the most recent `type=="user"` message whose `content` is a string and doesn't start with `<` (filters out tool results and system reminders), takes its first line, truncates to 30 characters, and shows a `normal` toast |
+| `Notification` | A permission prompt or input request is waiting | Pulls the `message` field from stdin (e.g. `"Permission needed for Bash(rm …)"`) and shows a `critical` toast that stays on screen until clicked |
 
-Both scripts call `tmux display-message -t "$TMUX_PANE" -p -F '#W'` to get the name of the pane Claude is actually running in — not whatever window happens to be focused. They also record `#S:#I` (session:window-index) so the click-to-jump knows where to go later. If `$TMUX_PANE` is unset (Claude running outside tmux), the title falls back to plain `Claude` and the click action is omitted.
-
-### Background notifier
-
-The hook itself only collects context and `nohup`-spawns `tmux-notify-bg.sh`, then exits. The background helper:
-
-1. Calls `notify-send -A "open=Open session" ...` — which implies `--wait` and blocks until the user either clicks `[Open session]`, dismisses the notification, or an outer `timeout` safety net trips (8s + 30s buffer for Stop, 10min for sticky Notification).
-2. If the user clicks the action, runs `tmux select-window -t "$session:$window-index"` to move the tmux client to the originating window.
-3. On X11, walks the parent process tree of the current tmux client's tty up to the terminal emulator (gnome-terminal, alacritty, kitty, …) and `xdotool windowactivate`s its X window so the terminal comes to the foreground.
-
-This separation matters because `notify-send -A` blocks indefinitely — running it inline would freeze the hook (and therefore Claude) until the user clicked. Spawning to the background means the hook reliably returns in tens of milliseconds.
+Both scripts call `tmux display-message -t "$TMUX_PANE" -p -F '#W'` to get the name of the pane Claude is actually running in — not whatever window happens to be focused. If `$TMUX_PANE` is unset (Claude running outside tmux), the title falls back to plain `Claude`.
 
 ## Customizing
 
@@ -189,10 +175,7 @@ If you want to include hook-feedback or system messages too, drop the `startswit
 | Wrong window name shown | You're inside a nested tmux session and the hook is reading the outer pane. Use only one level of tmux, or override `TMUX` in your shell init. |
 | No prompt preview, only `✅ Task complete` | Either the hook's stdin doesn't have `transcript_path` (older Claude Code) or `jq` isn't installed. |
 | Permission notification doesn't stay on screen | Your notification daemon doesn't honor `--urgency=critical`. dunst and GNOME Shell do; some minimal stacks don't. |
-| `[Open session]` button doesn't appear | Your notification daemon doesn't support actions on `notify-send -A`. GNOME Shell, KDE Plasma, dunst, and mako all do; some minimal stacks don't. |
-| Click on `[Open session]` switches tmux but doesn't raise the window | You're on Wayland (window-raise is X11-only by design), or `xdotool` isn't installed, or the terminal emulator isn't in the recognized list inside `tmux-notify-bg.sh` (add yours to the `case` block). |
 | Notification works in interactive shell but not from systemd / IDE | `DBUS_SESSION_BUS_ADDRESS` not propagated to the Claude process — launch Claude from a regular desktop terminal. |
-| Stale `tmux-notify-bg.sh` processes piling up | They self-terminate via the outer `timeout` (8s + 30s for Stop, 10min for Notification). If you see them stuck longer than that, kill them with `pkill -f tmux-notify-bg.sh` and report a bug. |
 
 ## What this plugin does not do
 
