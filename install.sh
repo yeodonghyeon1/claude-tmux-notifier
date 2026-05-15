@@ -10,6 +10,7 @@ DEST=${CLAUDE_HOOKS_DIR:-$HOME/.claude/hooks}
 mkdir -p "$DEST"
 install -m 0755 "$REPO_DIR/hooks/tmux-notify-stop.sh"  "$DEST/"
 install -m 0755 "$REPO_DIR/hooks/tmux-notify-input.sh" "$DEST/"
+install -m 0755 "$REPO_DIR/hooks/tmux-notify-bg.sh"    "$DEST/"
 
 echo
 echo "Hook scripts installed to: $DEST"
