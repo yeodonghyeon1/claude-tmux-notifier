@@ -79,8 +79,31 @@ if [ -n "${DISPLAY:-}" ]; then
     done
 
     if [ -n "$TERM_PID" ] && command -v xdotool >/dev/null 2>&1; then
-      WID=$(xdotool search --pid "$TERM_PID" 2>/dev/null | head -1)
-      [ -n "$WID" ] && xdotool windowactivate "$WID" 2>/dev/null || true
+      # Multi-window terminals (Terminator, gnome-terminal, …) report many
+      # X windows under the same PID — most are hidden/internal. We need the
+      # one the user actually sees: visible, mapped, NOT marked SKIP_TASKBAR
+      # (Terminator's tray/preference windows carry SKIP_TASKBAR + SKIP_PAGER).
+      WID=""
+      for CAND in $(xdotool search --onlyvisible --pid "$TERM_PID" 2>/dev/null); do
+        STATE=$(xprop -id "$CAND" _NET_WM_STATE 2>/dev/null || true)
+        case "$STATE" in
+          *SKIP_TASKBAR*|*SKIP_PAGER*) continue ;;
+        esac
+        WID="$CAND"
+        break
+      done
+      # Fallback: take the first visible window if filtering left nothing.
+      [ -z "$WID" ] && WID=$(xdotool search --onlyvisible --pid "$TERM_PID" 2>/dev/null | head -1)
+      if [ -n "$WID" ]; then
+        # --sync waits for the WM to actually apply the change.
+        xdotool windowactivate --sync "$WID" 2>/dev/null || true
+        # Belt-and-suspenders for window managers that ignore _NET_ACTIVE_WINDOW
+        # from non-pager sources (focus-stealing prevention).
+        xdotool windowraise "$WID" 2>/dev/null || true
+        if command -v wmctrl >/dev/null 2>&1; then
+          wmctrl -i -a "$WID" 2>/dev/null || true
+        fi
+      fi
     fi
   fi
 fi
